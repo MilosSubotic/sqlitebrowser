@@ -9,6 +9,8 @@
 #include <QKeyEvent>
 #include <QScrollBar>
 #include <QHeaderView>
+#include <QMessageBox>
+#include <QDebug> // TODO Just for debugging.
 
 ExtendedTableWidget::ExtendedTableWidget(QWidget* parent) :
     QTableView(parent)
@@ -34,6 +36,7 @@ void ExtendedTableWidget::copy()
     {
         return;
     } else if(indices.size() == 1) {
+        qDebug() << indices.front().data().toString();
         qApp->clipboard()->setText(indices.front().data().toString());
         return;
     }
@@ -48,6 +51,7 @@ void ExtendedTableWidget::copy()
     foreach(QModelIndex index, indices)
     {
         // Add the content of this cell to the clipboard string
+        qDebug() << prev.data().toString();
         result.append(QString("\"%1\"").arg(prev.data().toString()));
 
         // If this is a new row add a line break, if not add a tab for cell separation
@@ -59,14 +63,14 @@ void ExtendedTableWidget::copy()
         prev = index;
     }
     result.append(QString("\"%1\"\r\n").arg(indices.last().data().toString()));      // And the last cell
-
+    qDebug() << result;
     // And finally add it to the clipboard
     qApp->clipboard()->setText(result);
 }
 
 void ExtendedTableWidget::paste()
 {
-    QString text = qApp->clipboard()->text();
+    QString clipboard = qApp->clipboard()->text();
 
     // Get list of selected items
     QItemSelectionModel* selection = selectionModel();
@@ -76,12 +80,49 @@ void ExtendedTableWidget::paste()
     if(indices.size() == 0)
     {
         return;
-    } else if(indices.size() == 1) {
+    }
+    qDebug() << "paste()";
+    qDebug() << clipboard;
+
+    // Find out dimensions of clipboard, assuming that cliboard data is rectangular
+    int clipboardRows = clipboard.count('\n');
+    qDebug() << "clipboardRows = " << clipboardRows;
+    int clipboardColumns = clipboard.count('\t') / clipboardRows + 1;
+    qDebug() << "clipboardColumns = " << clipboardColumns;
+
+    // Sort the items by row, then by column
+    qSort(indices);
+
+    // Starting from assumption that selection is rectangular, and then first index is upper-left corner and last is lower-right.
+    int selectedRowStart = indices.front().row();
+    int selectedRows = indices.back().row() - selectedRowStart + 1;
+    int selectedColumnStart = indices.front().column();
+    int selectedColumns = indices.back().column() - selectedColumnStart + 1;
+
+    qDebug() << "selectedRowStart = " << selectedRowStart;
+    qDebug() << "selectedColumnStart = " << selectedColumnStart;
+    qDebug() << "selectedRows = " << selectedRows;
+    qDebug() << "selectedColumns = " << selectedColumns;
+
+    // If not selected only one cell then check does selection match cliboard dimensions
+    if(selectedRows != 1 && selectedColumns != 1)
+    {
+        if(selectedRows != clipboardRows || selectedColumns != clipboardColumns)
+        {
+            // Ask user is it sure about this
+            QMessageBox::StandardButton reply = QMessageBox::question(this, tr("asdf"),
+                tr("The content of clipboard is bigger than the range selected. Do you want to insert it anyway?"),
+                QMessageBox::Yes|QMessageBox::No);
+        }
+    }
+/*
+    if(indices.size() == 1) {
         QModelIndex index = indices.front();
         SqliteTableModel* m = qobject_cast<SqliteTableModel*>(model());
         m->setData(index, text);
         return;
     }
+*/
 
     // TODO multi row/column paste.
 }
