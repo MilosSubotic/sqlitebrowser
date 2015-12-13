@@ -64,12 +64,63 @@ void ExtendedTableWidget::copy()
     qApp->clipboard()->setText(result);
 }
 
+void ExtendedTableWidget::paste()
+{
+    QString text = qApp->clipboard()->text();
+
+    // Get list of selected items
+    QItemSelectionModel* selection = selectionModel();
+    QModelIndexList indices = selection->selectedIndexes();
+
+    // Abort if there's nowhere to paste
+    if(indices.size() == 0)
+    {
+        return;
+    } else if(indices.size() == 1) {
+        QModelIndex index = indices.front();
+        SqliteTableModel* m = qobject_cast<SqliteTableModel*>(model());
+        m->setData(index, text);
+        return;
+    }
+
+    // TODO multi row/column paste.
+}
+
+void ExtendedTableWidget::erase()
+{
+
+    // Get list of selected items
+    QItemSelectionModel* selection = selectionModel();
+    QModelIndexList indices = selection->selectedIndexes();
+
+    // Abort if there's nothing to erase
+    if(indices.size() == 0)
+    {
+        return;
+    }
+
+    // Erase all selected cells by setting them to NULL
+    SqliteTableModel* m = qobject_cast<SqliteTableModel*>(model());
+    foreach(QModelIndex index, indices)
+    {
+        m->setData(index, QVariant());
+    }
+}
+
 void ExtendedTableWidget::keyPressEvent(QKeyEvent* event)
 {
     // Call a custom copy method when Ctrl-C is pressed
     if(event->matches(QKeySequence::Copy))
     {
         copy();
+    // Call a custom paste method when Ctrl-P is pressed
+    } else if(event->matches(QKeySequence::Paste))
+    {
+        paste();
+    // Call a custom erase method when Delete is pressed
+    } else if(event->key() == Qt::Key_Delete)
+    {
+        erase();
     } else if(event->key() == Qt::Key_Tab && hasFocus() &&
               selectedIndexes().count() == 1 &&
               selectedIndexes().at(0).row() == model()->rowCount()-1 && selectedIndexes().at(0).column() == model()->columnCount()-1) {

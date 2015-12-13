@@ -22,6 +22,8 @@ signals:
 
 private:
     void copy();
+    void paste();
+    void erase();
     int numVisibleRows();
 
 private slots:
