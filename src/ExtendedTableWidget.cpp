@@ -10,7 +10,6 @@
 #include <QScrollBar>
 #include <QHeaderView>
 #include <QMessageBox>
-#include <QDebug> // TODO Just for debugging.
 
 ExtendedTableWidget::ExtendedTableWidget(QWidget* parent) :
     QTableView(parent)
@@ -79,8 +78,6 @@ void ExtendedTableWidget::paste()
     {
         return;
     }
-    qDebug() << "paste()";
-    qDebug() << clipboard;
 
 
     // Find out end of line character
@@ -109,7 +106,6 @@ void ExtendedTableWidget::paste()
     // Unpack cliboard, assuming that it is rectangular
     QList<QStringList> clipboardTable;
     QStringList cr = clipboard.split(endOfLine);
-    qDebug() << cr.size();
     foreach(const QString& r, cr)
     {
         // Usually last splited line is empty
@@ -123,9 +119,6 @@ void ExtendedTableWidget::paste()
     int clipboardColumns = clipboardTable.front().size();
 
 
-    qDebug() << "clipboardRows = " << clipboardRows;
-    qDebug() << "clipboardColumns = " << clipboardColumns;
-
     // Sort the items by row, then by column
     qSort(indices);
 
@@ -135,10 +128,6 @@ void ExtendedTableWidget::paste()
     int firstColumn = indices.front().column();
     int selectedColumns = indices.back().column() - firstColumn + 1;
 
-    qDebug() << "firstRow = " << firstRow;
-    qDebug() << "firstColumn = " << firstColumn;
-    qDebug() << "selectedRows = " << selectedRows;
-    qDebug() << "selectedColumns = " << selectedColumns;
 
     // If not selected only one cell then check does selection match cliboard dimensions
     if(selectedRows != 1 || selectedColumns != 1)
@@ -162,8 +151,6 @@ void ExtendedTableWidget::paste()
     // If last row and column are after table size clamp it
     int lastRow = qMin(firstRow + clipboardRows - 1, m->rowCount() - 1);
     int lastColumn = qMin(firstColumn + clipboardColumns - 1, m->columnCount() - 1);
-    qDebug() << "lastRow = " << lastRow;
-    qDebug() << "lastColumn = " << lastColumn;
 
     int row = firstRow;
     foreach(const QStringList& clipboardRow, clipboardTable)
