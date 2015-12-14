@@ -1135,6 +1135,7 @@ void MainWindow::setCurrentFile(const QString &fileName)
     setWindowFilePath(fileName);
     setWindowTitle( QApplication::applicationName() +" - "+fileName);
     activateFields(true);
+    ui->dataTable->setRootDir(QFileInfo(fileName).absoluteDir());
 }
 
 void MainWindow::addToRecentFilesMenu(const QString& filename)

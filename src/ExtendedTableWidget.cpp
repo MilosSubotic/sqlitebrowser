@@ -2,6 +2,7 @@
 #include "sqlitetablemodel.h"
 #include "FilterTableHeader.h"
 #include "sqlitetypes.h"
+#include "ColoringDelegate.h"
 
 #include <QApplication>
 #include <QClipboard>
@@ -10,10 +11,15 @@
 #include <QScrollBar>
 #include <QHeaderView>
 #include <QMessageBox>
+#include <QFileDialog>
+#include <QUrl>
+#include <QDesktopServices>
 
 ExtendedTableWidget::ExtendedTableWidget(QWidget* parent) :
-    QTableView(parent)
+    QTableView(parent), delegate(new ColoringDelegate(this))
 {
+    setItemDelegate(delegate);
+
     setHorizontalScrollMode(ExtendedTableWidget::ScrollPerPixel);
 
     connect(verticalScrollBar(), SIGNAL(valueChanged(int)), this, SLOT(vscrollbarChanged(int)));
@@ -197,6 +203,79 @@ void ExtendedTableWidget::erase()
     }
 }
 
+void ExtendedTableWidget::selectFile()
+{
+    // Get list of selected items
+    QItemSelectionModel* selection = selectionModel();
+    QModelIndexList indices = selection->selectedIndexes();
+
+    // Just modifing one field.
+    if(indices.size() != 1)
+    {
+        return;
+    }
+    QModelIndex index = indices.front();
+    SqliteTableModel* m = qobject_cast<SqliteTableModel*>(model());
+
+    QString columnName = m->headerData(index.column(), Qt::Horizontal, Qt::DisplayRole).toString();
+    // Opening just if column is appropriate
+    if(columnName != "File")
+    {
+        return;
+    }
+
+    QString dir;
+    if(lastDir.exists())
+    {
+        dir = lastDir.absolutePath();
+    }
+    else
+    {
+        dir = rootDir.absolutePath();
+    }
+    QString fileName = QFileDialog::getOpenFileName(
+        this,
+        tr("Select File"),
+        dir
+    );
+
+    if(fileName != "")
+    {
+        QFileInfo fi(fileName);
+        if(fi.isFile())
+        {
+            lastDir = fi.absoluteDir();
+            m->setData(index, rootDir.relativeFilePath(fileName));
+        }
+    }
+}
+
+void ExtendedTableWidget::openFile()
+{
+    // Get list of selected items
+    QItemSelectionModel* selection = selectionModel();
+    QModelIndexList indices = selection->selectedIndexes();
+
+    // Opening just one file.
+    if(indices.size() != 1)
+    {
+        return;
+    }
+    QModelIndex index = indices.front();
+    SqliteTableModel* m = qobject_cast<SqliteTableModel*>(model());
+
+    QString columnName = m->headerData(index.column(), Qt::Horizontal, Qt::DisplayRole).toString();
+    // Opening just if column is appropriate
+    if(columnName != "File")
+    {
+        return;
+    }
+
+    QString fileName = index.data().toString();
+    QUrl url = QUrl::fromLocalFile(rootDir.absoluteFilePath(fileName));
+    QDesktopServices::openUrl(url);
+}
+
 void ExtendedTableWidget::keyPressEvent(QKeyEvent* event)
 {
     // Call a custom copy method when Ctrl-C is pressed
@@ -211,6 +290,17 @@ void ExtendedTableWidget::keyPressEvent(QKeyEvent* event)
     } else if(event->key() == Qt::Key_Delete)
     {
         erase();
+    } else if(event->key() == Qt::Key_F &&
+              event->modifiers().testFlag(Qt::ControlModifier))
+    {
+        if(event->modifiers().testFlag(Qt::ShiftModifier))
+        {
+            selectFile();
+        }
+        else
+        {
+            openFile();
+        }
     } else if(event->key() == Qt::Key_Tab && hasFocus() &&
               selectedIndexes().count() == 1 &&
               selectedIndexes().at(0).row() == model()->rowCount()-1 && selectedIndexes().at(0).column() == model()->columnCount()-1) {
@@ -267,6 +357,12 @@ QSet<int> ExtendedTableWidget::selectedCols()
     foreach(const QModelIndex & idx, selectedIndexes())
         selectedCols.insert(idx.column());
     return selectedCols;
+}
+void ExtendedTableWidget::setRootDir(const QDir &rootDir)
+{
+    this->rootDir = rootDir;
+    lastDir = rootDir;
+    delegate->setRootDir(rootDir);
 }
 
 void ExtendedTableWidget::cellClicked(const QModelIndex& index)

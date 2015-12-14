@@ -4,6 +4,9 @@
 #include <QTableView>
 #include "FilterTableHeader.h"
 #include <QSet>
+#include <QDir>
+
+class ColoringDelegate;
 
 class ExtendedTableWidget : public QTableView
 {
@@ -16,6 +19,7 @@ public:
 
 public:
     QSet<int> selectedCols();
+    void setRootDir(const QDir &rootDir);
 
 signals:
     void foreignKeyClicked(const QString& table, const QString& column, const QByteArray& value);
@@ -24,6 +28,8 @@ private:
     void copy();
     void paste();
     void erase();
+    void selectFile();
+    void openFile();
     int numVisibleRows();
 
 private slots:
@@ -35,6 +41,9 @@ protected:
     virtual void updateGeometries();
 
     FilterTableHeader* m_tableHeader;
+    ColoringDelegate* delegate;
+    QDir rootDir;
+    QDir lastDir;
 };
 
 #endif

@@ -53,7 +53,8 @@ HEADERS += \
     SqlUiLexer.h \
     FileDialog.h \
     ColumnDisplayFormatDialog.h \
-    FilterLineEdit.h
+    FilterLineEdit.h \
+    ColoringDelegate.h
 
 SOURCES += \
     sqlitedb.cpp \
@@ -82,7 +83,8 @@ SOURCES += \
     SqlUiLexer.cpp \
     FileDialog.cpp \
     ColumnDisplayFormatDialog.cpp \
-    FilterLineEdit.cpp
+    FilterLineEdit.cpp \
+    ColoringDelegate.cpp
 
 RESOURCES += icons/icons.qrc \
              translations/flags/flags.qrc \
