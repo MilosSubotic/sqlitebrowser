@@ -36,7 +36,6 @@ void ExtendedTableWidget::copy()
     {
         return;
     } else if(indices.size() == 1) {
-        qDebug() << indices.front().data().toString();
         qApp->clipboard()->setText(indices.front().data().toString());
         return;
     }
@@ -51,7 +50,6 @@ void ExtendedTableWidget::copy()
     foreach(QModelIndex index, indices)
     {
         // Add the content of this cell to the clipboard string
-        qDebug() << prev.data().toString();
         result.append(QString("\"%1\"").arg(prev.data().toString()));
 
         // If this is a new row add a line break, if not add a tab for cell separation
@@ -63,7 +61,7 @@ void ExtendedTableWidget::copy()
         prev = index;
     }
     result.append(QString("\"%1\"\r\n").arg(indices.last().data().toString()));      // And the last cell
-    qDebug() << result;
+
     // And finally add it to the clipboard
     qApp->clipboard()->setText(result);
 }
@@ -84,47 +82,111 @@ void ExtendedTableWidget::paste()
     qDebug() << "paste()";
     qDebug() << clipboard;
 
-    // Find out dimensions of clipboard, assuming that cliboard data is rectangular
-    int clipboardRows = clipboard.count('\n');
+
+    // Find out end of line character
+    QString endOfLine;
+    if(clipboard.endsWith('\n'))
+    {
+        if(clipboard.endsWith("\r\n"))
+        {
+            endOfLine = "\r\n";
+        }
+        else
+        {
+            endOfLine = "\n";
+        }
+    }
+    else if(clipboard.endsWith('\r'))
+    {
+        endOfLine = "\r";
+    }
+    else
+    {
+        // Have only one cell, so there is no line break at end
+        endOfLine = "\n";
+    }
+
+    // Unpack cliboard, assuming that it is rectangular
+    QList<QStringList> clipboardTable;
+    QStringList cr = clipboard.split(endOfLine);
+    qDebug() << cr.size();
+    foreach(const QString& r, cr)
+    {
+        // Usually last splited line is empty
+        if(!r.isEmpty())
+        {
+            clipboardTable.push_back(r.split("\t"));
+        }
+    }
+
+    int clipboardRows = clipboardTable.size();
+    int clipboardColumns = clipboardTable.front().size();
+
+
     qDebug() << "clipboardRows = " << clipboardRows;
-    int clipboardColumns = clipboard.count('\t') / clipboardRows + 1;
     qDebug() << "clipboardColumns = " << clipboardColumns;
 
     // Sort the items by row, then by column
     qSort(indices);
 
     // Starting from assumption that selection is rectangular, and then first index is upper-left corner and last is lower-right.
-    int selectedRowStart = indices.front().row();
-    int selectedRows = indices.back().row() - selectedRowStart + 1;
-    int selectedColumnStart = indices.front().column();
-    int selectedColumns = indices.back().column() - selectedColumnStart + 1;
+    int firstRow = indices.front().row();
+    int selectedRows = indices.back().row() - firstRow + 1;
+    int firstColumn = indices.front().column();
+    int selectedColumns = indices.back().column() - firstColumn + 1;
 
-    qDebug() << "selectedRowStart = " << selectedRowStart;
-    qDebug() << "selectedColumnStart = " << selectedColumnStart;
+    qDebug() << "firstRow = " << firstRow;
+    qDebug() << "firstColumn = " << firstColumn;
     qDebug() << "selectedRows = " << selectedRows;
     qDebug() << "selectedColumns = " << selectedColumns;
 
     // If not selected only one cell then check does selection match cliboard dimensions
-    if(selectedRows != 1 && selectedColumns != 1)
+    if(selectedRows != 1 || selectedColumns != 1)
     {
         if(selectedRows != clipboardRows || selectedColumns != clipboardColumns)
         {
             // Ask user is it sure about this
             QMessageBox::StandardButton reply = QMessageBox::question(this, tr("asdf"),
-                tr("The content of clipboard is bigger than the range selected. Do you want to insert it anyway?"),
+                tr("The content of clipboard is bigger than the range selected.\nDo you want to insert it anyway?"),
                 QMessageBox::Yes|QMessageBox::No);
+            if(reply != QMessageBox::Yes)
+            {
+                return;
+            }
         }
     }
-/*
-    if(indices.size() == 1) {
-        QModelIndex index = indices.front();
-        SqliteTableModel* m = qobject_cast<SqliteTableModel*>(model());
-        m->setData(index, text);
-        return;
-    }
-*/
+    // Here we have positive answer even if cliboard is bigger than selection
 
-    // TODO multi row/column paste.
+
+    SqliteTableModel* m = qobject_cast<SqliteTableModel*>(model());
+    // If last row and column are after table size clamp it
+    int lastRow = qMin(firstRow + clipboardRows - 1, m->rowCount() - 1);
+    int lastColumn = qMin(firstColumn + clipboardColumns - 1, m->columnCount() - 1);
+    qDebug() << "lastRow = " << lastRow;
+    qDebug() << "lastColumn = " << lastColumn;
+
+    int row = firstRow;
+    foreach(const QStringList& clipboardRow, clipboardTable)
+    {
+        int column = firstColumn;
+        foreach(const QString& cell, clipboardRow)
+        {
+            m->setData(m->index(row, column), cell);
+
+            column++;
+            if(column> lastColumn)
+            {
+                break;
+            }
+        }
+
+        row++;
+        if(row > lastRow)
+        {
+            break;
+        }
+    }
+
 }
 
 void ExtendedTableWidget::erase()
