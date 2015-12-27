@@ -52,6 +52,7 @@ MainWindow::MainWindow(QWidget* parent)
       ui(new Ui::MainWindow),
       m_browseTableModel(new SqliteTableModel(this, &db, PreferencesDialog::getSettingsValue("db", "prefetchsize").toInt())),
       editWin(new EditDialog(this)),
+      editDock(new EditDialog(this, true)),
       gotoValidator(new QIntValidator(0, 0, this))
 {
     ui->setupUi(this);
@@ -90,13 +91,17 @@ void MainWindow::init()
     ui->treeSchemaDock->setColumnHidden(1, true);
     ui->treeSchemaDock->setColumnWidth(0, 300);
 
+    // Edit dock
+    ui->dockEditWindow->setWidget(editDock);
+    ui->dockEditWindow->hide();     // Hidden by default
+
     // Add keyboard shortcuts
     QList<QKeySequence> shortcuts = ui->actionExecuteSql->shortcuts();
     shortcuts.push_back(QKeySequence(tr("Ctrl+Return")));
     ui->actionExecuteSql->setShortcuts(shortcuts);
 
     QShortcut* shortcutBrowseRefresh = new QShortcut(QKeySequence("Ctrl+R"), this);
-    QObject::connect(shortcutBrowseRefresh, SIGNAL(activated()), ui->buttonRefresh, SLOT(click()));
+    connect(shortcutBrowseRefresh, SIGNAL(activated()), ui->buttonRefresh, SLOT(click()));
 
     // Create the actions for the recently opened dbs list
     for(int i = 0; i < MaxRecentFiles; ++i) {
@@ -147,6 +152,10 @@ void MainWindow::init()
     ui->viewMenu->actions().at(2)->setShortcut(QKeySequence(tr("Ctrl+I")));
     ui->viewMenu->actions().at(2)->setIcon(QIcon(":/icons/log_dock"));
 
+    // Add menu item for edit dock
+    ui->viewMenu->insertAction(ui->viewDBToolbarAction, ui->dockEditWindow->toggleViewAction());
+    ui->viewMenu->actions().at(3)->setIcon(QIcon(":/icons/log_dock"));
+
     // Set statusbar fields
     statusEncryptionLabel = new QLabel(ui->statusbar);
     statusEncryptionLabel->setEnabled(false);
@@ -174,6 +183,8 @@ void MainWindow::init()
     connect(ui->dataTable->horizontalHeader(), SIGNAL(sectionResized(int,int,int)), this, SLOT(updateBrowseDataColumnWidth(int,int,int)));
     connect(editWin, SIGNAL(goingAway()), this, SLOT(editWinAway()));
     connect(editWin, SIGNAL(updateRecordText(int, int, QByteArray)), this, SLOT(updateRecordText(int, int, QByteArray)));
+    connect(editDock, SIGNAL(goingAway()), this, SLOT(editWinAway()));
+    connect(editDock, SIGNAL(updateRecordText(int, int, QByteArray)), this, SLOT(updateRecordText(int, int, QByteArray)));
     connect(ui->dbTreeWidget->selectionModel(), SIGNAL(currentChanged(QModelIndex,QModelIndex)), this, SLOT(changeTreeSelection()));
     connect(ui->dataTable->horizontalHeader(), SIGNAL(customContextMenuRequested(QPoint)), this, SLOT(showDataColumnPopupMenu(QPoint)));
 
@@ -203,7 +214,7 @@ void MainWindow::init()
     {
         // Check for a new release version, usually only enabled on windows
         m_NetworkManager = new QNetworkAccessManager(this);
-        QObject::connect(m_NetworkManager, SIGNAL(finished(QNetworkReply*)), this, SLOT(httpresponse(QNetworkReply*)));
+        connect(m_NetworkManager, SIGNAL(finished(QNetworkReply*)), this, SLOT(httpresponse(QNetworkReply*)));
 
         QUrl url("https://raw.githubusercontent.com/sqlitebrowser/sqlitebrowser/master/currentrelease");
         m_NetworkManager->get(QNetworkRequest(url));
@@ -233,7 +244,9 @@ bool MainWindow::fileOpen(const QString& fileName, bool dontAddToRecentFiles)
     }
     if(QFile::exists(wFile) )
     {
-        fileClose();
+        // Close the database. If the user didn't want to close it, though, stop here
+        if(!fileClose())
+            return false;
 
         // Try opening it as a project file first
         if(loadProject(wFile))
@@ -341,7 +354,12 @@ void MainWindow::populateTable(const QString& tablename)
     QApplication::setOverrideCursor(Qt::WaitCursor);
 
     // Set model
+    bool reconnectSelectionSignals = false;
+    if(ui->dataTable->model() == 0)
+        reconnectSelectionSignals = true;
     ui->dataTable->setModel(m_browseTableModel);
+    if(reconnectSelectionSignals)
+        connect(ui->dataTable->selectionModel(), SIGNAL(currentChanged(QModelIndex,QModelIndex)), this, SLOT(dataTableSelectionChanged(QModelIndex)));
 
     // Search stored table settings for this table
     QMap<QString, BrowseDataTableSettings>::ConstIterator tableIt;
@@ -426,8 +444,8 @@ void MainWindow::populateTable(const QString& tablename)
     setRecordsetLabel();
 
     // Reset the edit dialog
-    if(editWin)
-        editWin->reset();
+    editWin->reset();
+    editDock->reset();
 
     // update plot
     updatePlot(m_browseTableModel);
@@ -465,10 +483,11 @@ void MainWindow::resetBrowser()
     populateTable(ui->comboBrowseTable->currentText());
 }
 
-void MainWindow::fileClose()
+bool MainWindow::fileClose()
 {
+    // Close the database but stop the closing process here if the user pressed the cancel button in there
     if(!db.close())
-        return;
+        return false;
 
     setWindowTitle(QApplication::applicationName());
     resetBrowser();
@@ -481,6 +500,7 @@ void MainWindow::fileClose()
     delete m_browseTableModel;
     m_browseTableModel = new SqliteTableModel(this, &db, PreferencesDialog::getSettingsValue("db", "prefetchsize").toInt());
     connect(ui->dataTable->filterHeader(), SIGNAL(filterChanged(int,QString)), this, SLOT(updateFilter(int,QString)));
+    connect(m_browseTableModel, SIGNAL(dataChanged(QModelIndex,QModelIndex,QVector<int>)), this, SLOT(dataTableSelectionChanged(QModelIndex)));
 
     // Remove all stored table information browse data tab
     browseTableSettings.clear();
@@ -496,6 +516,8 @@ void MainWindow::fileClose()
     ui->buttonLogClear->click();
     for(int i=ui->tabSqlAreas->count()-1;i>=0;i--)
         closeSqlTab(i, true);
+
+    return true;
 }
 
 void MainWindow::closeEvent( QCloseEvent* event )
@@ -727,27 +749,52 @@ void MainWindow::updateRecordText(int row, int col, const QByteArray& newtext)
 
 void MainWindow::editWinAway()
 {
-    editWin->hide();
-    activateWindow();
-    ui->dataTable->setCurrentIndex(ui->dataTable->currentIndex().sibling(editWin->getCurrentRow(), editWin->getCurrentCol()));
-}
+    // Get the sender
+    EditDialog* sendingEditDialog = qobject_cast<EditDialog*>(sender());
 
-void MainWindow::editText(const QModelIndex& index)
-{
-    editWin->loadText(index.data(Qt::EditRole).toByteArray(), index.row(), index.column());
-    editWin->show();
+    // Only hide the edit window, not the edit dock
+    editWin->hide();
+
+    // Update main window
+    activateWindow();
+    ui->dataTable->setFocus();
+    ui->dataTable->setCurrentIndex(ui->dataTable->currentIndex().sibling(sendingEditDialog->getCurrentRow(), sendingEditDialog->getCurrentCol()));
 }
 
 void MainWindow::doubleClickTable(const QModelIndex& index)
 {
+    // Cancel on invalid index
     if(!index.isValid())
         return;
 
     // Don't allow editing of other objects than tables
-    if(db.getObjectByName(ui->comboBrowseTable->currentText()).gettype() != "table")
+    bool allowEditing = db.getObjectByName(ui->comboBrowseTable->currentText()).gettype() == "table";
+    editDock->allowEditing(allowEditing);
+    editWin->allowEditing(allowEditing);
+
+    // Load the current value into both, edit window and edit dock
+    editWin->loadText(index.data(Qt::EditRole).toByteArray(), index.row(), index.column());
+    editDock->loadText(index.data(Qt::EditRole).toByteArray(), index.row(), index.column());
+
+    // If the edit dock is visible don't open the edit window. If it's invisible open the edit window.
+    // The edit dock obviously doesn't need to be opened when it's already visible but setting focus to it makes sense.
+    if(!ui->dockEditWindow->isVisible())
+        editWin->show();
+    else
+        editDock->setFocus();
+}
+
+void MainWindow::dataTableSelectionChanged(const QModelIndex& index)
+{
+    // Cancel on invalid index
+    if(!index.isValid())
         return;
 
-    editText(index);
+    // Don't allow editing of other objects than tables
+    editDock->allowEditing(db.getObjectByName(ui->comboBrowseTable->currentText()).gettype() == "table");
+
+    // Load the current value into the edit dock only
+    editDock->loadText(index.data(Qt::EditRole).toByteArray(), index.row(), index.column());
 }
 
 /*
@@ -1123,6 +1170,11 @@ void MainWindow::updateRecentFileActions()
         recentFileActs[i]->setText(text);
         recentFileActs[i]->setData(files[i]);
         recentFileActs[i]->setVisible(true);
+
+        // Add shortcut for opening the file using the keyboard. However, if the application is configured to store
+        // more than nine recently opened files don't set shortcuts for the later ones which wouldn't be single digit anymore.
+        if(i < 9)
+            recentFileActs[i]->setShortcut(QKeySequence(Qt::CTRL + (Qt::Key_1+i)));
     }
     for (int j = numRecentFiles; j < MaxRecentFiles; ++j)
         recentFileActs[j]->setVisible(false);
@@ -1207,6 +1259,7 @@ void MainWindow::activateFields(bool enable)
     ui->actionSaveProject->setEnabled(enable);
     ui->actionEncryption->setEnabled(enable && write);
     ui->buttonClearFilters->setEnabled(enable);
+    ui->dockEditWindow->setEnabled(enable && write);
 }
 
 void MainWindow::browseTableHeaderClicked(int logicalindex)
@@ -2314,9 +2367,8 @@ void MainWindow::editDataColumnDisplayFormat()
 
 void MainWindow::showRowidColumn(bool show)
 {
-    // FIXME: Workaround for actually getting the next line to work reliably
-    //ui->dataTable->setModel(0);
-    //ui->dataTable->setModel(m_browseTableModel);
+    // Block all signals from the horizontal header. Otherwise the QHeaderView::sectionResized signal causes us trouble
+    ui->dataTable->horizontalHeader()->blockSignals(true);
 
     // Show/hide rowid column
     ui->dataTable->setColumnHidden(0, !show);
@@ -2330,6 +2382,9 @@ void MainWindow::showRowidColumn(bool show)
 
     // Update the filter row
     qobject_cast<FilterTableHeader*>(ui->dataTable->horizontalHeader())->generateFilters(m_browseTableModel->columnCount(), show);
+
+    // Re-enable signals
+    ui->dataTable->horizontalHeader()->blockSignals(false);
 }
 
 void MainWindow::browseDataSetTableEncoding(bool forAllTables)
@@ -2343,7 +2398,7 @@ void MainWindow::browseDataSetTableEncoding(bool forAllTables)
     if(forAllTables)
         question = tr("Please choose a new encoding for this table.");
     else
-        question = tr("Please choose a new encoding for all table.");
+        question = tr("Please choose a new encoding for all tables.");
     encoding = QInputDialog::getText(this,
                                      tr("Set encoding"),
                                      tr("%1\nLeave the field empty for using the database encoding.").arg(question),

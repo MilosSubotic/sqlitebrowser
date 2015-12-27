@@ -141,7 +141,7 @@ void ExtendedTableWidget::paste()
         if(selectedRows != clipboardRows || selectedColumns != clipboardColumns)
         {
             // Ask user is it sure about this
-            QMessageBox::StandardButton reply = QMessageBox::question(this, tr("asdf"),
+            QMessageBox::StandardButton reply = QMessageBox::question(this, QApplication::applicationName(),
                 tr("The content of clipboard is bigger than the range selected.\nDo you want to insert it anyway?"),
                 QMessageBox::Yes|QMessageBox::No);
             if(reply != QMessageBox::Yes)
@@ -164,7 +164,15 @@ void ExtendedTableWidget::paste()
         int column = firstColumn;
         foreach(const QString& cell, clipboardRow)
         {
-            m->setData(m->index(row, column), cell);
+            if(cell.startsWith('"') && cell.endsWith('"'))
+            {
+                QString unquatedCell = cell.mid(1, cell.length()-2);
+                m->setData(m->index(row, column), unquatedCell);
+            }
+            else
+            {
+                m->setData(m->index(row, column), cell);
+            }
 
             column++;
             if(column> lastColumn)
@@ -180,27 +188,6 @@ void ExtendedTableWidget::paste()
         }
     }
 
-}
-
-void ExtendedTableWidget::erase()
-{
-
-    // Get list of selected items
-    QItemSelectionModel* selection = selectionModel();
-    QModelIndexList indices = selection->selectedIndexes();
-
-    // Abort if there's nothing to erase
-    if(indices.size() == 0)
-    {
-        return;
-    }
-
-    // Erase all selected cells by setting them to NULL
-    SqliteTableModel* m = qobject_cast<SqliteTableModel*>(model());
-    foreach(QModelIndex index, indices)
-    {
-        m->setData(index, QVariant());
-    }
 }
 
 void ExtendedTableWidget::selectFile()
@@ -286,10 +273,6 @@ void ExtendedTableWidget::keyPressEvent(QKeyEvent* event)
     } else if(event->matches(QKeySequence::Paste))
     {
         paste();
-    // Call a custom erase method when Delete is pressed
-    } else if(event->key() == Qt::Key_Delete)
-    {
-        erase();
     } else if(event->key() == Qt::Key_F &&
               event->modifiers().testFlag(Qt::ControlModifier))
     {
@@ -306,6 +289,21 @@ void ExtendedTableWidget::keyPressEvent(QKeyEvent* event)
               selectedIndexes().at(0).row() == model()->rowCount()-1 && selectedIndexes().at(0).column() == model()->columnCount()-1) {
         // If the Tab key was pressed while the focus was on the last cell of the last row insert a new row automatically
         model()->insertRow(model()->rowCount());
+    } else if(event->key() == Qt::Key_Delete) {
+        if(event->modifiers().testFlag(Qt::AltModifier))
+        {
+            // When pressing Alt+Delete set the value to NULL
+            foreach(const QModelIndex& index, selectedIndexes())
+                model()->setData(index, QString());
+        } else {
+            // When pressing Delete only set the value to empty string
+            foreach(const QModelIndex& index, selectedIndexes())
+                model()->setData(index, "");
+        }
+    } else if(event->key() == Qt::Key_Return && selectedIndexes().count() == 1) {
+        // When hitting the return key simulate a double click. This way you can change the focus to the editor dock when pressing the
+        // return key for advanced editing, just like a double click would open the edit dialog
+        emit doubleClicked(selectedIndexes().at(0));
     }
 
     // This prevents the current selection from being changed when pressing tab to move to the next filter. Note that this is in an 'if' condition,
@@ -376,4 +374,21 @@ void ExtendedTableWidget::cellClicked(const QModelIndex& index)
         if(fk.isSet())
             emit foreignKeyClicked(fk.table(), fk.columns().size() ? fk.columns().at(0) : "", m->data(index, Qt::EditRole).toByteArray());
     }
+}
+
+void ExtendedTableWidget::dragEnterEvent(QDragEnterEvent* event)
+{
+    event->accept();
+}
+
+void ExtendedTableWidget::dragMoveEvent(QDragMoveEvent* event)
+{
+    event->accept();
+}
+
+void ExtendedTableWidget::dropEvent(QDropEvent* event)
+{
+    QModelIndex index = indexAt(event->pos());
+    model()->dropMimeData(event->mimeData(), Qt::CopyAction, index.row(), index.column(), QModelIndex());
+    event->acceptProposedAction();
 }

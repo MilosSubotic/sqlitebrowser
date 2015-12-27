@@ -143,6 +143,14 @@ bool DBBrowserDB::open(const QString& db)
         QFileInfo fid(fi.absoluteDir().absolutePath());
         isReadOnly = !fi.isWritable() || !fid.isWritable();
 
+        // Execute default SQL
+        if(!isReadOnly)
+        {
+            QString default_sql = settings.value( "/db/defaultsqltext", "").toString();
+            if(!default_sql.isEmpty())
+                executeMultiSQL(default_sql, false, true);
+        }
+
         curDBFilename = db;
         return true;
     } else {
@@ -305,7 +313,7 @@ bool DBBrowserDB::releaseAllSavepoints()
         if(!releaseSavepoint(point))
             return false;
     }
-    executeSQL("COMMIT;");  // Just to be sure
+    executeSQL("COMMIT;", false, false);  // Just to be sure
     return true;
 }
 
@@ -359,6 +367,11 @@ bool DBBrowserDB::create ( const QString & db)
         executeSQL("CREATE TABLE notempty (id integer primary key);", false, false);
         executeSQL("DROP TABLE notempty;", false, false);
         executeSQL("COMMIT;", false, false);
+
+        // Execute default SQL
+        QString default_sql = settings.value( "/db/defaultsqltext", "").toString();
+        if(!default_sql.isEmpty())
+            executeMultiSQL(default_sql, false, true);
 
         curDBFilename = db;
         isEncrypted = false;
