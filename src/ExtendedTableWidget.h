@@ -5,6 +5,7 @@
 #include <QStyledItemDelegate>
 #include <QSortFilterProxyModel>
 #include <unordered_set>
+#include <QDir>
 
 #include "sql/Query.h"
 
@@ -41,8 +42,17 @@ public:
     void setModelData(QWidget* editor, QAbstractItemModel* model, const QModelIndex& index) const override;
     void updateEditorGeometry(QWidget* editor, const QStyleOptionViewItem& option, const QModelIndex& index) const override;
 
+public:
+    void setRootDir(const QDir &rootDir){ this->m_rootDir = rootDir; }
+
+protected:
+    virtual void initStyleOption(QStyleOptionViewItem *option, const QModelIndex &index) const;
+
 signals:
     void dataAboutToBeEdited(QModelIndex index) const;
+
+private:
+    QDir m_rootDir;
 };
 
 class ExtendedTableWidget : public QTableView
@@ -61,6 +71,8 @@ public:
     std::unordered_set<size_t> selectedCols() const;
     // Get set of columns traversed by selection (only some cells in column has to be selected)
     std::unordered_set<size_t> colsInSelection() const;
+
+    void setRootDir(const QDir &rootDir);
 
     int numVisibleRows() const;
 
@@ -96,6 +108,9 @@ private:
     void paste();
     void cut();
 
+    void selectFile();
+    void openFile();
+
     void useAsFilter(const QString& filterOperator, bool binary = false, const QString& operatorSuffix = QString());
     void duplicateUpperCell();
 
@@ -129,6 +144,10 @@ protected:
     FilterTableHeader* m_tableHeader;
     QMenu* m_contextMenu;
     ExtendedTableWidgetEditorDelegate* m_editorDelegate;
+
+private:
+    QDir m_rootDir;
+    QDir m_lastDir;
 };
 
 #endif

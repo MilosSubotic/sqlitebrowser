@@ -24,6 +24,9 @@
 #include <QCompleter>
 #include <QComboBox>
 #include <QShortcut>
+#include <QFileDialog>
+#include <QUrl>
+#include <QDesktopServices>
 
 #include <limits>
 
@@ -222,6 +225,21 @@ void ExtendedTableWidgetEditorDelegate::updateEditorGeometry(QWidget* editor, co
     editor->setGeometry(option.rect);
 }
 
+void ExtendedTableWidgetEditorDelegate::initStyleOption(QStyleOptionViewItem *option, const QModelIndex &index) const
+{
+    QStyledItemDelegate::initStyleOption(option, index);
+
+    QString columnName = index.model()->headerData(index.column(), Qt::Horizontal, Qt::DisplayRole).toString();
+    if(columnName == "File")
+    {
+        QString fileName = index.data().toString();
+        QFileInfo fi(m_rootDir, fileName);
+        if(!fi.isFile())
+        {
+            option->backgroundBrush = QBrush(Qt::red);
+        }
+    }
+}
 
 ExtendedTableWidget::ExtendedTableWidget(QWidget* parent) :
     QTableView(parent),
@@ -862,6 +880,79 @@ void ExtendedTableWidget::duplicateUpperCell()
     }
 }
 
+void ExtendedTableWidget::selectFile()
+{
+    // Get list of selected items
+    QItemSelectionModel* selection = selectionModel();
+    QModelIndexList indices = selection->selectedIndexes();
+
+    // Just modifing one field.
+    if(indices.size() != 1)
+    {
+        return;
+    }
+    QModelIndex index = indices.front();
+    SqliteTableModel* m = qobject_cast<SqliteTableModel*>(model());
+
+    QString columnName = m->headerData(index.column(), Qt::Horizontal, Qt::DisplayRole).toString();
+    // Opening just if column is appropriate
+    if(columnName != "File")
+    {
+        return;
+    }
+
+    QString dir;
+    if(m_lastDir.exists())
+    {
+        dir = m_lastDir.absolutePath();
+    }
+    else
+    {
+        dir = m_rootDir.absolutePath();
+    }
+    QString fileName = QFileDialog::getOpenFileName(
+        this,
+        tr("Select File"),
+        dir
+    );
+
+    if(fileName != "")
+    {
+        QFileInfo fi(fileName);
+        if(fi.isFile())
+        {
+            m_lastDir = fi.absoluteDir();
+            m->setData(index, m_rootDir.relativeFilePath(fileName));
+        }
+    }
+}
+
+void ExtendedTableWidget::openFile()
+{
+    // Get list of selected items
+    QItemSelectionModel* selection = selectionModel();
+    QModelIndexList indices = selection->selectedIndexes();
+
+    // Opening just one file.
+    if(indices.size() != 1)
+    {
+        return;
+    }
+    QModelIndex index = indices.front();
+    SqliteTableModel* m = qobject_cast<SqliteTableModel*>(model());
+
+    QString columnName = m->headerData(index.column(), Qt::Horizontal, Qt::DisplayRole).toString();
+    // Opening just if column is appropriate
+    if(columnName != "File")
+    {
+        return;
+    }
+
+    QString fileName = index.data().toString();
+    QUrl url = QUrl::fromLocalFile(m_rootDir.absoluteFilePath(fileName));
+    QDesktopServices::openUrl(url);
+}
+
 void ExtendedTableWidget::keyPressEvent(QKeyEvent* event)
 {
     // Call a custom copy method when Ctrl-C is pressed
@@ -875,6 +966,17 @@ void ExtendedTableWidget::keyPressEvent(QKeyEvent* event)
     } else if(event->matches(QKeySequence::Paste)) {
         // Call a custom paste method when Ctrl-V is pressed
         paste();
+    } else if(event->key() == Qt::Key_G &&
+              event->modifiers().testFlag(Qt::ControlModifier))
+    {
+        if(event->modifiers().testFlag(Qt::ShiftModifier))
+        {
+            selectFile();
+        }
+        else
+        {
+            openFile();
+        }
     } else if(event->matches(QKeySequence::Print)) {
         openPrintDialog();
     } else if(event->modifiers().testFlag(Qt::ControlModifier) && event->modifiers().testFlag(Qt::ShiftModifier) && (event->key() == Qt::Key_C)) {
@@ -1000,6 +1102,13 @@ std::unordered_set<size_t> ExtendedTableWidget::colsInSelection() const
     for(const QModelIndex & idx : selectedIndexes())
         colsInSelection.insert(static_cast<size_t>(idx.column()));
     return colsInSelection;
+}
+
+void ExtendedTableWidget::setRootDir(const QDir &rootDir)
+{
+    this->m_rootDir = rootDir;
+    m_lastDir = rootDir;
+    m_editorDelegate->setRootDir(rootDir);
 }
 
 void ExtendedTableWidget::cellClicked(const QModelIndex& index)

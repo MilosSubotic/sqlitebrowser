@@ -19,6 +19,7 @@ class SqliteTableModel;
 
 class QAbstractItemModel;
 class QIntValidator;
+class QDir;
 
 namespace Ui {
 class TableBrowser;
@@ -75,6 +76,8 @@ public:
 
     static void setDefaultEncoding(const QString& encoding) { m_defaultEncoding = encoding; }
     static QString defaultEncoding() { return m_defaultEncoding; }
+
+    void setRootDir(const QDir &rootDir);
 
 public slots:
     void setEnabled(bool enable);

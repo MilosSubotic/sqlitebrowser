@@ -435,6 +435,11 @@ QModelIndex TableBrowser::currentIndex() const
     return ui->dataTable->currentIndex();
 }
 
+void TableBrowser::setRootDir(const QDir &rootDir)
+{
+    ui->dataTable->setRootDir(rootDir);
+}
+
 void TableBrowser::setEnabled(bool enable)
 {
     ui->browseToolbar->setEnabled(enable);

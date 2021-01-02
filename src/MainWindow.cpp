@@ -1735,8 +1735,11 @@ void MainWindow::setCurrentFile(const QString &fileName)
         setWindowTitle(QApplication::applicationName() + " - " + QDir::toNativeSeparators(currentProjectFilename) + " [" + dbFileName + "]");
     }
     activateFields(!fileName.isEmpty());
-    if(!fileName.isEmpty())
+    if(!fileName.isEmpty()) {
         dbState(db.getDirty());
+        for(const auto& d : allTableBrowserDocks())
+            d->tableBrowser()->setRootDir(QFileInfo(fileName).absoluteDir());
+    }
 }
 
 void MainWindow::addToRecentFilesMenu(const QString& filename, bool read_only)
