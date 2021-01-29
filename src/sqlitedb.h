@@ -80,6 +80,7 @@ public:
     bool detach(const std::string& attached_as);
     bool create ( const QString & db);
     bool close();
+    bool saveAs(const std::string& filename);
 
     // This returns the SQLite version as well as the SQLCipher if DB4S is compiled with encryption support
     static void getSqliteVersion(QString& sqlite, QString& sqlcipher);
@@ -151,7 +152,7 @@ public:
     bool getRow(const sqlb::ObjectIdentifier& table, const QString& rowid, std::vector<QByteArray>& rowdata) const;
 
     /**
-     * @brief Interrupts the currenty running statement as soon as possible.
+     * @brief Interrupts the currently running statement as soon as possible.
      */
     void interruptQuery();
 
@@ -283,13 +284,13 @@ private:
 
     bool tryEncryptionSettings(const QString& filename, bool* encrypted, CipherSettings*& cipherSettings) const;
 
-    bool dontCheckForStructureUpdates;
+    bool disableStructureUpdateChecks;
 
     class NoStructureUpdateChecks
     {
     public:
-        explicit NoStructureUpdateChecks(DBBrowserDB& db) : m_db(db) { m_db.dontCheckForStructureUpdates = true; }
-        ~NoStructureUpdateChecks() { m_db.dontCheckForStructureUpdates = false; }
+        explicit NoStructureUpdateChecks(DBBrowserDB& db) : m_db(db) { m_db.disableStructureUpdateChecks = true; }
+        ~NoStructureUpdateChecks() { m_db.disableStructureUpdateChecks = false; }
 
     private:
           DBBrowserDB& m_db;

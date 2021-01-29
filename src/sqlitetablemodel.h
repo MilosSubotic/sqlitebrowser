@@ -80,7 +80,7 @@ public:
     QModelIndex dittoRecord(int old_row);
 
     /// configure for browsing results of specified query
-    void setQuery(const QString& sQuery, const QString& sCountQuery = QString(), bool dontClearHeaders = false);
+    void setQuery(const QString& sQuery);
 
     std::string query() const { return m_sQuery.toStdString(); }
     std::string customQuery(bool withRowid) const { return m_query.buildQuery(withRowid); }
@@ -149,7 +149,6 @@ public slots:
 signals:
     void finishedFetch(int fetched_row_begin, int fetched_row_end);
     void finishedRowCount();
-    void columnsChanged();
 
 protected:
     Qt::DropActions supportedDropActions() const override;
@@ -166,7 +165,9 @@ private:
     void handleFinishedFetch(int life_id, unsigned int fetched_row_begin, unsigned int fetched_row_end);
     void handleRowCountComplete(int life_id, int num_rows);
 
-    void buildQuery();
+    void updateAndRunQuery();
+
+    void getColumnNames(const std::string& sQuery);
 
     QByteArray encode(const QByteArray& str) const;
     QByteArray decode(const QByteArray& str) const;

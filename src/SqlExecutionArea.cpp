@@ -44,10 +44,10 @@ SqlExecutionArea::SqlExecutionArea(DBBrowserDB& _db, QWidget* parent) :
 
     // Save to settings when sppliter is moved, but only to memory.
     connect(ui->splitter, &QSplitter::splitterMoved, this,  [this]() {
-            Settings::setValue("editor", "splitter1_sizes", ui->splitter->saveState(), /* dont_save_to_disk */ true);
+            Settings::setValue("editor", "splitter1_sizes", ui->splitter->saveState(), /* save_to_disk */ false);
         });
     connect(ui->splitter_2, &QSplitter::splitterMoved, this, [this]() {
-            Settings::setValue("editor", "splitter2_sizes", ui->splitter_2->saveState(), /* dont_save_to_disk */ true);
+            Settings::setValue("editor", "splitter2_sizes", ui->splitter_2->saveState(), /* save_to_disk */ false);
         });
 
     // Set collapsible the editErrors panel
@@ -197,7 +197,7 @@ void SqlExecutionArea::findLineEdit_textChanged(const QString &)
     // position, or from begin of the selection position.
 
     // For incremental search while typing we need to start from the
-    // begining of the current selection, otherwise we'd jump to the
+    // beginning of the current selection, otherwise we'd jump to the
     // next occurrence
     if (ui->editEditor->hasSelectedText()) {
         int lineFrom;

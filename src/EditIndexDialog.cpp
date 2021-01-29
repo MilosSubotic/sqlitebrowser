@@ -75,7 +75,7 @@ EditIndexDialog::EditIndexDialog(DBBrowserDB& db, const sqlb::ObjectIdentifier& 
     }
 
     // Add event handler for index column name changes. These are only allowed for expression columns, though.
-    connect(ui->tableIndexColumns, &QTableWidget::itemChanged,
+    connect(ui->tableIndexColumns, &QTableWidget::itemChanged, this,
             [=](QTableWidgetItem* item)
     {
         index.fields[static_cast<size_t>(item->row())].setName(item->text().toStdString());
@@ -141,7 +141,7 @@ void EditIndexDialog::updateColumnLists()
         }
     }
 
-    // Set row count to actual count. This is needed for the intial loading, when some rows might have been omitted because they were used in the index
+    // Set row count to actual count. This is needed for the initial loading, when some rows might have been omitted because they were used in the index
     ui->tableTableColumns->setRowCount(tableRows);
 
     // Fill the index column list. This is done separately from the table column to include expression columns (these are not found in the original
@@ -166,7 +166,7 @@ void EditIndexDialog::updateColumnLists()
         order->addItem("DESC");
         order->setCurrentText(QString::fromStdString(indexFields.at(i).order()).toUpper());
         ui->tableIndexColumns->setCellWidget(static_cast<int>(i), 1, order);
-        connect(order, &QComboBox::currentTextChanged,
+        connect(order, &QComboBox::currentTextChanged, this,
                 [=](QString new_order)
         {
             auto colnum = sqlb::findField(index, indexFields.at(i).name());

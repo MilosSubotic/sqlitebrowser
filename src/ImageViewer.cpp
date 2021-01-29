@@ -11,7 +11,7 @@ ImageViewer::ImageViewer(QWidget* parent) :
     ui(new Ui::ImageViewer)
 {
     ui->setupUi(this);
-    connect(ui->buttonOriginalSize, &QToolButton::clicked, [this]{ scaleImage(100); });
+    connect(ui->buttonOriginalSize, &QToolButton::clicked, this, [this]{ scaleImage(100); });
 
     ui->labelView->addAction(ui->actionPrintImage);
 }
@@ -43,14 +43,20 @@ void ImageViewer::openPrintImageDialog()
     QPrinter printer;
     QPrintPreviewDialog dialog(&printer);
 
-    connect(&dialog, &QPrintPreviewDialog::paintRequested, [&](QPrinter* previewPrinter) {
+    connect(&dialog, &QPrintPreviewDialog::paintRequested, &dialog, [&](QPrinter* previewPrinter) {
         QPainter painter(previewPrinter);
         QRect rect = painter.viewport();
-        QSize size = ui->labelView->pixmap()->size();
+#if QT_VERSION < QT_VERSION_CHECK(5, 15, 0)
+        QPixmap pixmap = *ui->labelView->pixmap();
+#else
+        QPixmap pixmap = ui->labelView->pixmap(Qt::ReturnByValue);
+#endif
+
+        QSize size = pixmap.size();
         size.scale(rect.size(), Qt::KeepAspectRatio);
         painter.setViewport(rect.x(), rect.y(), size.width(), size.height());
-        painter.setWindow(ui->labelView->pixmap()->rect());
-        painter.drawPixmap(0, 0, *ui->labelView->pixmap());
+        painter.setWindow(pixmap.rect());
+        painter.drawPixmap(0, 0, pixmap);
     });
 
     dialog.exec();
@@ -68,7 +74,7 @@ void ImageViewer::scaleToFitWindow(bool enabled)
 
 void ImageViewer::scaleImage(int scale)
 {
-    // Make sure the slider is updated when this is called programatically
+    // Make sure the slider is updated when this is called programmatically
     ui->sliderScale->setValue(scale);
 
     // Update our scale factor
@@ -76,12 +82,17 @@ void ImageViewer::scaleImage(int scale)
     m_scale_factor = scale / 100.0;
 
     // Resize the image
-    ui->labelView->resize(m_scale_factor * ui->labelView->pixmap()->size());
+#if QT_VERSION < QT_VERSION_CHECK(5, 15, 0)
+    QPixmap pixmap = *ui->labelView->pixmap();
+#else
+    QPixmap pixmap = ui->labelView->pixmap(Qt::ReturnByValue);
+#endif
+    ui->labelView->resize(m_scale_factor * pixmap.size());
 
     // Uncheck the fit to window button
     ui->buttonFitToWindow->setChecked(false);
 
-    // Fix scroll bars to zoom into center of viewport instead of tthe upper left corner
+    // Fix scroll bars to zoom into center of viewport instead of the upper left corner
     const auto adjust_scrollbar = [](QScrollBar* scroll_bar, qreal factor) {
         scroll_bar->setValue(static_cast<int>(factor * scroll_bar->value() + ((factor - 1) * scroll_bar->pageStep() / 2)));
     };

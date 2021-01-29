@@ -5,7 +5,7 @@ please consult http://www.qt.io and for SQLite please see https://sqlite.org/.
 
 Please note that all versions after 3.9.1 will require:
 * Qt 5.5 or later, however we advise you to use 5.7 or later
-* A C++ compiler with support for C++11 or later
+* A C++ compiler with support for C++14 or later
 
 Without these or with older versions you won't be able to compile DB Browser for
 Sqlite anymore. This applies to all platforms. However, most likely you won't
@@ -78,6 +78,10 @@ Done. :)
 **Note 2** - On CentOS 7.x, you need to replace the `qwt-qt5-devel` package name with
 `qt5-qtbase-devel` in the `dnf install` line below.
 
+
+**Note 3** - On CentOS 8 (Stream), you need to replace the `qt-devel` package name with
+`qt5-devel` in the `dnf install` line below. Make sure the `PowerTools` repo is enabled.
+
 ```
 $ sudo dnf install cmake gcc-c++ git qt-devel qt5-linguist qwt-qt5-devel \
        sqlite-devel
@@ -142,7 +146,7 @@ its name (eg ~/tmp/foo'), as compiling will error out.
 And compiling it:
 
     $ cd sqlitebrowser
-    $ qmake
+    $ qmake CONFIG+="c++14"
     $ make
     $ brew unlink sqlitefts5
     $ mv src/DB\ Browser\ for\ SQLite.app /Applications/
@@ -155,11 +159,11 @@ list, ready to launch.
 'make' step complaining about no targets.  This seems to be solvable by
 running:
 
-    $ qmake -spec macx-g++
+    $ qmake -spec macx-g++ CONFIG+="c++14"
 
 or:
 
-    $ qmake -spec macx-llvm
+    $ qmake -spec macx-llvm CONFIG+="c++14"
 
 (before the 'make' step)
 
@@ -223,7 +227,7 @@ Now compile:
 
     $ make
 
-If you additionaly want an NSIS installer:
+If you additionally want an NSIS installer:
 
     $ make package
 

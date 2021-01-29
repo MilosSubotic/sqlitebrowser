@@ -30,7 +30,6 @@ public:
         std::function<std::shared_ptr<sqlite3>(void)> db_getter,
         std::function<void(QString)> statement_logger,
         std::vector<std::string> & headers,
-        std::vector<int>& data_types,
         std::mutex & cache_mutex,
         Cache & cache_data
         );
@@ -71,7 +70,6 @@ private:
     const std::function<std::shared_ptr<sqlite3>()> db_getter;
     const std::function<void(QString)> statement_logger;
     std::vector<std::string> & headers;
-    std::vector<int> & data_types;
     std::mutex & cache_mutex;
     Cache & cache_data;
 
@@ -82,6 +80,8 @@ private:
     QString countQuery;
 
     mutable std::future<void> row_counter;
+
+    bool first_chunk_loaded;
 
     size_t num_tasks;
     std::shared_ptr<sqlite3> pDb; //< exclusive access while held...

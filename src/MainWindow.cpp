@@ -103,22 +103,20 @@ void MainWindow::init()
 
     // Automatic update check
 #ifdef CHECKNEWVERSION
-    connect(&RemoteNetwork::get(), &RemoteNetwork::networkReady, [this]() {
-        // Check for a new version if automatic update check aren't disabled in the settings dialog
-        if(Settings::getValue("checkversion", "enabled").toBool())
-        {
-            RemoteNetwork::get().fetch(QUrl("https://download.sqlitebrowser.org/currentrelease"), RemoteNetwork::RequestTypeCustom,
-                                       QString(), [this](const QByteArray& reply) {
-                QList<QByteArray> info = reply.split('\n');
-                if(info.size() >= 2)
-                {
-                    QString version = info.at(0).trimmed();
-                    QString url = info.at(1).trimmed();
-                    checkNewVersion(version, url);
-                }
-            });
-        }
-    });
+    // Check for a new version if automatic update check aren't disabled in the settings dialog
+    if(Settings::getValue("checkversion", "enabled").toBool())
+    {
+        RemoteNetwork::get().fetch(QUrl("https://download.sqlitebrowser.org/currentrelease"), RemoteNetwork::RequestTypeCustom,
+                                   QString(), [this](const QByteArray& reply) {
+            QList<QByteArray> info = reply.split('\n');
+            if(info.size() >= 2)
+            {
+                QString version = info.at(0).trimmed();
+                QString url = info.at(1).trimmed();
+                checkNewVersion(version, url);
+            }
+        });
+    }
 #endif
 
     // create facade objects to dbTreeWidgets
@@ -315,11 +313,11 @@ void MainWindow::init()
         action->setObjectName(widget->accessibleName());
         action->setCheckable(true);
         action->setChecked(ui->mainTab->indexOf(widget) != -1);
-        connect(action, &QAction::toggled, [=](bool show) { toggleTabVisible(widget, show); });
-        // Connect tabCloseRequested for setting checked the appropiate menu entry.
+        connect(action, &QAction::toggled, this, [=](bool show) { toggleTabVisible(widget, show); });
+        // Connect tabCloseRequested for setting checked the appropriate menu entry.
         // Note these are called after the actual tab is closed only because they are connected
         // after connecting closeTab.
-        connect(ui->mainTab, &QTabWidget::tabCloseRequested, [=](int /*index*/) {
+        connect(ui->mainTab, &QTabWidget::tabCloseRequested, this, [=](int /*index*/) {
                 action->setChecked(ui->mainTab->indexOf(widget) != -1);
             });
     }
@@ -331,7 +329,7 @@ void MainWindow::init()
 
     QAction* resetLayoutAction = layoutMenu->addAction(tr("Reset Window Layout"));
     resetLayoutAction->setShortcut(QKeySequence(tr("Alt+0")));
-    connect(resetLayoutAction, &QAction::triggered, [=]() {
+    connect(resetLayoutAction, &QAction::triggered, this, [=]() {
             restoreState(defaultWindowState);
             restoreOpenTabs(defaultOpenTabs);
             ui->viewDBToolbarAction->setChecked(!ui->toolbarDB->isHidden());
@@ -340,7 +338,7 @@ void MainWindow::init()
         });
     QAction* simplifyLayoutAction = layoutMenu->addAction(tr("Simplify Window Layout"));
     simplifyLayoutAction->setShortcut(QKeySequence(tr("Shift+Alt+0")));
-    connect(simplifyLayoutAction, &QAction::triggered, [=]() {
+    connect(simplifyLayoutAction, &QAction::triggered, this, [=]() {
             ui->viewMenu->findChild<QAction *>(ui->pragmas->accessibleName())->activate(QAction::Trigger);
             ui->dockLog->hide();
             ui->dockPlot->hide();
@@ -349,15 +347,15 @@ void MainWindow::init()
             ui->dockRemote->hide();
         });
     QAction* atBottomLayoutAction = layoutMenu->addAction(tr("Dock Windows at Bottom"));
-    connect(atBottomLayoutAction, &QAction::triggered, [=]() {
+    connect(atBottomLayoutAction, &QAction::triggered, this, [=]() {
             moveDocksTo(Qt::BottomDockWidgetArea);
         });
     QAction* atLeftLayoutAction = layoutMenu->addAction(tr("Dock Windows at Left Side"));
-    connect(atLeftLayoutAction, &QAction::triggered, [=]() {
+    connect(atLeftLayoutAction, &QAction::triggered, this, [=]() {
             moveDocksTo(Qt::LeftDockWidgetArea);
         });
     QAction* atTopLayoutAction = layoutMenu->addAction(tr("Dock Windows at Top"));
-    connect(atTopLayoutAction, &QAction::triggered, [=]() {
+    connect(atTopLayoutAction, &QAction::triggered, this, [=]() {
             moveDocksTo(Qt::TopDockWidgetArea);
         });
 
@@ -365,13 +363,13 @@ void MainWindow::init()
     // Note that it is safe to call setCurrentIndex with a tab that is currently closed,
     // since setCurrentIndex does nothing in that case.
     QShortcut* setTab1Shortcut = new QShortcut(QKeySequence("Alt+1"), this);
-    connect(setTab1Shortcut, &QShortcut::activated, [this]() { ui->mainTab->setCurrentIndex(0); });
+    connect(setTab1Shortcut, &QShortcut::activated, this, [this]() { ui->mainTab->setCurrentIndex(0); });
     QShortcut* setTab2Shortcut = new QShortcut(QKeySequence("Alt+2"), this);
-    connect(setTab2Shortcut, &QShortcut::activated, [this]() { ui->mainTab->setCurrentIndex(1); });
+    connect(setTab2Shortcut, &QShortcut::activated, this, [this]() { ui->mainTab->setCurrentIndex(1); });
     QShortcut* setTab3Shortcut = new QShortcut(QKeySequence("Alt+3"), this);
-    connect(setTab3Shortcut, &QShortcut::activated, [this]() { ui->mainTab->setCurrentIndex(2); });
+    connect(setTab3Shortcut, &QShortcut::activated, this, [this]() { ui->mainTab->setCurrentIndex(2); });
     QShortcut* setTab4Shortcut = new QShortcut(QKeySequence("Alt+4"), this);
-    connect(setTab4Shortcut, &QShortcut::activated, [this]() { ui->mainTab->setCurrentIndex(3); });
+    connect(setTab4Shortcut, &QShortcut::activated, this, [this]() { ui->mainTab->setCurrentIndex(3); });
 
     // If we're not compiling in SQLCipher, hide its FAQ link in the help menu
 #ifndef ENABLE_SQLCIPHER
@@ -414,17 +412,17 @@ void MainWindow::init()
     ui->statusbar->addPermanentWidget(statusEncodingLabel);
 
     // When changing the text of the toolbar actions, also automatically change their icon text and their tooltip text
-    connect(ui->editModifyObjectAction, &QAction::changed, [=]() {
+    connect(ui->editModifyObjectAction, &QAction::changed, this, [=]() {
         ui->editModifyObjectAction->setIconText(ui->editModifyObjectAction->text());
         ui->editModifyObjectAction->setToolTip(ui->editModifyObjectAction->text());
     });
-    connect(ui->editDeleteObjectAction, &QAction::changed, [=]() {
+    connect(ui->editDeleteObjectAction, &QAction::changed, this, [=]() {
         ui->editDeleteObjectAction->setIconText(ui->editDeleteObjectAction->text());
         ui->editDeleteObjectAction->setToolTip(ui->editDeleteObjectAction->text());
     });
 
     // When clicking the interrupt query button in the status bar, ask SQLite to interrupt the current query
-    connect(statusStopButton, &QToolButton::clicked, [this]() {
+    connect(statusStopButton, &QToolButton::clicked, this, [this]() {
        db.interruptQuery();
     });
 
@@ -432,7 +430,7 @@ void MainWindow::init()
     connect(editDock, &EditDialog::recordTextUpdated, this, &MainWindow::updateRecordText);
     connect(editDock, &EditDialog::evaluateText, this, &MainWindow::evaluateText);
     connect(editDock, &EditDialog::requestUrlOrFileOpen, this, &MainWindow::openUrlOrFile);
-    connect(ui->dbTreeWidget->selectionModel(), &QItemSelectionModel::currentChanged, this, &MainWindow::changeTreeSelection);
+    connect(ui->dbTreeWidget->selectionModel(), &QItemSelectionModel::selectionChanged, this, &MainWindow::changeTreeSelection);
     connect(ui->dockEdit, &QDockWidget::visibilityChanged, this, &MainWindow::toggleEditDock);
     connect(remoteDock, SIGNAL(openFile(QString)), this, SLOT(fileOpen(QString)));
     connect(ui->actionDropQualifiedCheck, &QAction::toggled, dbStructureModel, &DbStructureModel::setDropQualifiedNames);
@@ -442,27 +440,27 @@ void MainWindow::init()
     ui->actionDropQualifiedCheck->setChecked(Settings::getValue("SchemaDock", "dropQualifiedNames").toBool());
     ui->actionEnquoteNamesCheck->setChecked(Settings::getValue("SchemaDock", "dropEnquotedNames").toBool());
 
-    connect(ui->actionSqlStop, &QAction::triggered, [this]() {
+    connect(ui->actionSqlStop, &QAction::triggered, this, [this]() {
        if(execute_sql_worker && execute_sql_worker->isRunning())
            execute_sql_worker->stop();
     });
 
     // Connect tool pragmas
-    connect(ui->actionIntegrityCheck, &QAction::triggered, [this]() {
+    connect(ui->actionIntegrityCheck, &QAction::triggered, this, [this]() {
             runSqlNewTab("PRAGMA integrity_check;", ui->actionIntegrityCheck->text(), "https://www.sqlite.org/pragma.html#pragma_integrity_check");
     });
-    connect(ui->actionQuickCheck, &QAction::triggered, [this]() {
+    connect(ui->actionQuickCheck, &QAction::triggered, this, [this]() {
             runSqlNewTab("PRAGMA quick_check;", ui->actionQuickCheck->text(), "https://www.sqlite.org/pragma.html#pragma_quick_check");
     });
-    connect(ui->actionForeignKeyCheck, &QAction::triggered, [this]() {
+    connect(ui->actionForeignKeyCheck, &QAction::triggered, this, [this]() {
             runSqlNewTab("PRAGMA foreign_key_check;", ui->actionForeignKeyCheck->text(), "https://www.sqlite.org/pragma.html#pragma_foreign_key_check");
     });
-    connect(ui->actionOptimize, &QAction::triggered, [this]() {
+    connect(ui->actionOptimize, &QAction::triggered, this, [this]() {
             runSqlNewTab("PRAGMA optimize;", ui->actionOptimize->text(), "https://www.sqlite.org/pragma.html#pragma_optimize");
     });
 
     // Action for switching the table via the Database Structure tab
-    connect(ui->actionPopupSchemaDockBrowseTable, &QAction::triggered, [this]() {
+    connect(ui->actionPopupSchemaDockBrowseTable, &QAction::triggered, this, [this]() {
             switchToBrowseDataTab(dockDbSelected->object());
             refresh();  // Required in case the Browse Data tab already was the active main tab
     });
@@ -480,6 +478,12 @@ void MainWindow::init()
     addShortcutsTooltip(ui->actionSqlFind);
     addShortcutsTooltip(ui->actionSqlFindReplace);
     addShortcutsTooltip(ui->actionSqlToggleComment);
+
+    // Since in some keyboards pressing F keys is cumbersome, add an alternate shortcut and document
+    // it in the toolbar.
+    ui->fileCloseAction->setShortcuts({QKeySequence(tr("Ctrl+F4")), QKeySequence(tr("Ctrl+Alt+W"))});
+    ui->actionCloseProject->setShortcuts({QKeySequence(tr("Ctrl+Shift+W")), QKeySequence(tr("Ctrl+Shift+F4"))});
+    addShortcutsTooltip(ui->fileCloseAction);
 
     // Load all settings
     reloadSettings();
@@ -683,6 +687,30 @@ void MainWindow::refreshTableBrowsers(bool force_refresh)
     QApplication::restoreOverrideCursor();
 }
 
+bool MainWindow::fileSaveAs() {
+
+    QString fileName =  FileDialog::getSaveFileName(
+                    OpenDatabaseFile,
+                    this,
+                    tr("Choose a database file to save under"),
+                    FileDialog::getSqlDatabaseFileFilter()
+                    );
+    // catch situation where user has canceled file selection from dialog
+    if(!fileName.isEmpty()) {
+        bool result = db.saveAs(fileName.toStdString());
+        if(result) {
+            setCurrentFile(fileName);
+            addToRecentFilesMenu(fileName);
+        } else {
+            QMessageBox::warning(this, QApplication::applicationName(),
+                                 tr("Error while saving the database to the new file."));
+        }
+        return result;
+    } else {
+        return false;
+    }
+}
+
 bool MainWindow::fileClose()
 {
     // Stop any running SQL statements before closing the database
@@ -748,6 +776,8 @@ void MainWindow::closeEvent( QCloseEvent* event )
         Settings::setValue("SchemaDock", "dropEnquotedNames", ui->actionEnquoteNamesCheck->isChecked());
 
         SqlExecutionArea::saveState();
+
+        Settings::sync();
 
         QMainWindow::closeEvent(event);
     } else {
@@ -960,13 +990,13 @@ void MainWindow::editObject()
             refreshTableBrowsers();
     } else if(type == "view") {
         sqlb::ViewPtr view = db.getObjectByName<sqlb::View>(obj);
-        runSqlNewTab(QString("DROP VIEW %1;\n%2").arg(QString::fromStdString(obj.toString())).arg(QString::fromStdString(view->sql())),
+        runSqlNewTab(QString("DROP VIEW %1;\n%2").arg(QString::fromStdString(obj.toString()), QString::fromStdString(view->sql())),
                      tr("Edit View %1").arg(QString::fromStdString(obj.toDisplayString())),
                      "https://www.sqlite.org/lang_createview.html",
                      /* autoRun */ false);
     } else if(type == "trigger") {
         sqlb::TriggerPtr trigger = db.getObjectByName<sqlb::Trigger>(obj);
-        runSqlNewTab(QString("DROP TRIGGER %1;\n%2").arg(QString::fromStdString(obj.toString())).arg(QString::fromStdString(trigger->sql())),
+        runSqlNewTab(QString("DROP TRIGGER %1;\n%2").arg(QString::fromStdString(obj.toString()), QString::fromStdString(trigger->sql())),
                      tr("Edit Trigger %1").arg(QString::fromStdString(obj.toDisplayString())),
                      "https://www.sqlite.org/lang_createtrigger.html",
                      /* autoRun */ false);
@@ -1233,23 +1263,19 @@ void MainWindow::executeQuery()
 
         // Wait until the initial loading of data (= first chunk and row count) has been performed
         auto conn = std::make_shared<QMetaObject::Connection>();
-        *conn = connect(model, &SqliteTableModel::finishedFetch, [=](int fetched_row_begin, int fetched_row_end) {
-            // Avoid attaching the plot when the signal is notifying the row count, since the
-            // data wouldn't be available yet.
-            if(fetched_row_begin != fetched_row_end && fetched_row_begin != model->rowCount()) {
-                // Disconnect this connection right now. This avoids calling this slot multiple times
-                disconnect(*conn);
+        *conn = connect(model, &SqliteTableModel::finishedFetch, this, [=](int, int) {
+            // Disconnect this connection right now. This avoids calling this slot another time for the row count
+            disconnect(*conn);
 
-                attachPlot(sqlWidget->getTableResult(), sqlWidget->getModel());
-            } else {
-                connect(sqlWidget->getTableResult()->selectionModel(), &QItemSelectionModel::currentChanged, this, &MainWindow::dataTableSelectionChanged);
-                connect(sqlWidget->getTableResult(), &QTableView::doubleClicked, this, &MainWindow::doubleClickTable);
+            attachPlot(sqlWidget->getTableResult(), sqlWidget->getModel());
 
-                auto time_end = std::chrono::high_resolution_clock::now();
-                auto time_in_ms = std::chrono::duration_cast<std::chrono::milliseconds>(time_end-time_start);
-                query_logger(true, tr("%1 rows returned in %2ms").arg(model->rowCount()).arg(time_in_ms.count()+time_in_ms_so_far), from_position, to_position);
-                execute_sql_worker->startNextStatement();
-            }
+            connect(sqlWidget->getTableResult()->selectionModel(), &QItemSelectionModel::currentChanged, this, &MainWindow::dataTableSelectionChanged);
+            connect(sqlWidget->getTableResult(), &QTableView::doubleClicked, this, &MainWindow::doubleClickTable);
+
+            auto time_end = std::chrono::high_resolution_clock::now();
+            auto time_in_ms = std::chrono::duration_cast<std::chrono::milliseconds>(time_end-time_start);
+            query_logger(true, tr("%1 rows returned in %2ms").arg(model->rowCount()).arg(time_in_ms.count()+time_in_ms_so_far), from_position, to_position);
+            execute_sql_worker->startNextStatement();
         });
     }, Qt::QueuedConnection);
     connect(execute_sql_worker.get(), &RunSql::confirmSaveBeforePragmaOrVacuum, sqlWidget, [this]() {
@@ -1413,6 +1439,9 @@ void MainWindow::dbState(bool dirty)
 {
     ui->fileSaveAction->setEnabled(dirty);
     ui->fileRevertAction->setEnabled(dirty);
+    // Unfortunately, sqlite does not allow to backup the DB while there are pending savepoints,
+    // so we cannot "Save As" when the DB is dirty.
+    ui->fileSaveAsAction->setEnabled(!dirty);
 }
 
 void MainWindow::fileSave()
@@ -1825,6 +1854,7 @@ void MainWindow::activateFields(bool enable)
     bool tempDb = db.currentFile() == ":memory:";
 
     ui->fileCloseAction->setEnabled(enable);
+    ui->fileSaveAsAction->setEnabled(enable);
     ui->fileAttachAction->setEnabled(enable);
     ui->fileCompactAction->setEnabled(enable && write);
     ui->fileExportJsonAction->setEnabled(enable);
@@ -2103,7 +2133,7 @@ void MainWindow::openSqlFile()
                 tr("Select SQL file to open"),
                 tr("Text files(*.sql *.txt);;All files(*)"));
 
-    for(QString file: wfiles)
+    for(const QString& file: wfiles)
     {
         if(QFile::exists(file))
         {
@@ -2295,7 +2325,7 @@ void MainWindow::reloadSettings()
     db.loadExtensionsFromSettings();
 
     // Refresh view
-    db.structureUpdated();
+    emit db.structureUpdated();
     refreshTableBrowsers();
 
     // Hide or show the remote dock as needed
@@ -2372,7 +2402,7 @@ void MainWindow::on_actionWiki_triggered() const
     QDesktopServices::openUrl(QUrl("https://github.com/sqlitebrowser/sqlitebrowser/wiki"));
 }
 
-// 'Help | Bug Report...' link will set an appropiate body, add the system information and set the label 'bug' automatically to the issue
+// 'Help | Bug Report...' link will set an appropriate body, add the system information and set the label 'bug' automatically to the issue
 void MainWindow::on_actionBug_report_triggered() const
 {
     const QString version = Application::versionString();
@@ -2411,7 +2441,7 @@ void MainWindow::on_actionBug_report_triggered() const
     QDesktopServices::openUrl(url);
 }
 
-// 'Help | Feature Request...' link will set an appropiate body and add the label 'enhancement' automatically to the issue
+// 'Help | Feature Request...' link will set an appropriate body and add the label 'enhancement' automatically to the issue
 void MainWindow::on_actionFeature_Request_triggered() const
 {
     QUrlQuery query;
@@ -2764,7 +2794,7 @@ bool MainWindow::loadProject(QString filename, bool readOnly)
                                                   "it completely, please use DB Browser for SQLite version 3.12 to convert it to the new file format."));
                                 msgBox.exec();
                                 if(msgBox.clickedButton() == idontcarebutton)
-                                    Settings::setValue("idontcare", "projectBrowseTable", true);
+                                    Settings::setValue("idontcare", "projectBrowseTable", false);
                             }
 
                             xml.skipCurrentElement();
@@ -2849,7 +2879,7 @@ static void saveCondFormatMap(const QString& elementName, const BrowseDataTableS
     for(auto iter=condFormats.cbegin(); iter!=condFormats.cend(); ++iter) {
         xml.writeStartElement("column");
         xml.writeAttribute("index", QString::number(iter->first));
-        for(auto format : iter->second) {
+        for(const auto& format : iter->second) {
             xml.writeStartElement("format");
             xml.writeAttribute("condition", format.filter());
             xml.writeAttribute("background", format.backgroundColor().name());
@@ -3307,7 +3337,7 @@ void MainWindow::requestCollation(const QString& name, int eTextRep)
         // Cancel here if the No button was clicked
         if(msgbox.clickedButton() == button_dont_ask_again)
         {
-            Settings::setValue("db", "dont_ask_collation", true);
+            Settings::setValue("db", "dont_ask_collation", false);
         } else if(reply == QMessageBox::No) {
             return;
         }
@@ -3506,7 +3536,7 @@ void MainWindow::printDbStructure ()
     printer.setDocName(treeView->windowTitle());
 
     QPrintPreviewDialog *dialog = new QPrintPreviewDialog(&printer);
-    connect(dialog, &QPrintPreviewDialog::paintRequested, [strStream](QPrinter *previewPrinter) {
+    connect(dialog, &QPrintPreviewDialog::paintRequested, this, [strStream](QPrinter *previewPrinter) {
         QTextDocument document;
         document.setHtml(strStream);
         document.print(previewPrinter);
@@ -3524,7 +3554,6 @@ void MainWindow::updateDatabaseBusyStatus(bool busy, const QString& user)
     statusStopButton->setVisible(busy);
 }
 
-
 void MainWindow::closeTab(int index)
 {
     ui->mainTab->removeTab(index);
@@ -3540,9 +3569,13 @@ void MainWindow::toggleTabVisible(QWidget* tabWidget, bool show)
 
 void MainWindow::restoreOpenTabs(QString tabs)
 {
-    // Split the tab list, skiping the empty parts so the empty string turns to an empty list
+    // Split the tab list, skipping the empty parts so the empty string turns to an empty list
     // and not a list of one empty string.
+#if QT_VERSION < QT_VERSION_CHECK(5, 14, 0)
     QStringList tabList = tabs.split(' ', QString::SkipEmptyParts);
+#else
+    QStringList tabList = tabs.split(' ', Qt::SkipEmptyParts);
+#endif
 
     // Clear the tabs and then add them in the order specified by the setting.
     // Use the accessibleName attribute for restoring the tab label.
@@ -3601,13 +3634,13 @@ void MainWindow::showContextMenuSqlTabBar(const QPoint& pos)
     // Prepare all menu actions
     QAction* actionRename = new QAction(this);
     actionRename->setText(tr("Rename Tab"));
-    connect(actionRename, &QAction::triggered, [this, tab]() {
+    connect(actionRename, &QAction::triggered, this, [this, tab]() {
         renameSqlTab(tab);
     });
 
     QAction* actionDuplicate = new QAction(this);
     actionDuplicate->setText(tr("Duplicate Tab"));
-    connect(actionDuplicate, &QAction::triggered, [this, tab]() {
+    connect(actionDuplicate, &QAction::triggered, this, [this, tab]() {
         QString tab_name = ui->tabSqlAreas->tabText(tab).remove("&").remove(QRegExp(" \\(\\d+\\)$"));
         QString new_tab_name;
         for(int i=1;;i++)
@@ -3638,7 +3671,7 @@ void MainWindow::showContextMenuSqlTabBar(const QPoint& pos)
     QAction* actionClose = new QAction(this);
     actionClose->setText(tr("Close Tab"));
     actionClose->setShortcut(tr("Ctrl+W"));
-    connect(actionClose, &QAction::triggered, [this, tab]() {
+    connect(actionClose, &QAction::triggered, this, [this, tab]() {
         closeSqlTab(tab);
     });
 
@@ -3707,8 +3740,9 @@ void MainWindow::tableBrowserTabClosed()
         // If the currently active tab is closed activate another tab
         if(currentTableBrowser && sender() == currentTableBrowser->parent())
         {
-            allTableBrowserDocks().front()->activateWindow();
-            changeTableBrowserTab(allTableBrowserDocks().front());
+            auto all_docks = allTableBrowserDocks();
+            all_docks.front()->activateWindow();
+            changeTableBrowserTab(all_docks.front());
         }
     }
 }
@@ -3724,7 +3758,7 @@ TableBrowserDock* MainWindow::newTableBrowserTab(const sqlb::ObjectIdentifier& t
     d->tableBrowser()->setEnabled(ui->fileCloseAction->isEnabled());
 
     // Connect signals and slots
-    connect(d, &TableBrowserDock::newDockRequested, [this]() {
+    connect(d, &TableBrowserDock::newDockRequested, this, [this]() {
         newTableBrowserTab();
     });
     connect(d->tableBrowser(), &TableBrowser::projectModified, this, [this]() {
@@ -3742,13 +3776,13 @@ TableBrowserDock* MainWindow::newTableBrowserTab(const sqlb::ObjectIdentifier& t
     connect(d->tableBrowser(), &TableBrowser::statusMessageRequested, ui->statusbar, [this](const QString& message) {
         ui->statusbar->showMessage(message);
     });
-    connect(d->tableBrowser(), &TableBrowser::foreignKeyClicked, [this](const sqlb::ObjectIdentifier& table, std::string column, const QByteArray& value) {
+    connect(d->tableBrowser(), &TableBrowser::foreignKeyClicked, this, [this](const sqlb::ObjectIdentifier& table, std::string column, const QByteArray& value) {
         TableBrowserDock* foreign_key_dock = newTableBrowserTab(table);
         foreign_key_dock->tableBrowser()->jumpToRow(table, column, value);
         Application::processEvents();   // For some reason this is required for raise() to work here.
         foreign_key_dock->raise();
     });
-    connect(d->tableBrowser()->model(), &SqliteTableModel::finishedFetch, [this, d](){
+    connect(d->tableBrowser()->model(), &SqliteTableModel::finishedFetch, this, [this, d](){
         auto& settings = d->tableBrowser()->settings(d->tableBrowser()->currentlyBrowsedTableName());
         plotDock->updatePlot(d->tableBrowser()->model(), &settings, true, false);
     });
@@ -3756,7 +3790,11 @@ TableBrowserDock* MainWindow::newTableBrowserTab(const sqlb::ObjectIdentifier& t
     // Set up dock and add it to the tab
     ui->tabBrowsers->addDockWidget(Qt::TopDockWidgetArea, d);
     if(allTableBrowserDocks().size() > 1)
+#if QT_VERSION < QT_VERSION_CHECK(5, 6, 0)
         ui->tabBrowsers->tabifyDockWidget(allTableBrowserDocks().front(), d);
+#else
+        ui->tabBrowsers->tabifyDockWidget(allTableBrowserDocks().constFirst(), d);
+#endif
 
     // Set current model and browser
     d->activateWindow();

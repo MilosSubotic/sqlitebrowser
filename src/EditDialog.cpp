@@ -454,7 +454,7 @@ void EditDialog::exportData()
         break;
     case RtlText:
     case Text:
-        // Include the XML case on the text data type, since XML detection is not very sofisticated.
+        // Include the XML case on the text data type, since XML detection is not very sophisticated.
         if (ui->comboMode->currentIndex() == XmlEditor)
             filters << FILE_FILTER_XML
                     << FILE_FILTER_TXT;
@@ -1166,7 +1166,7 @@ void EditDialog::openPrintDialog()
     QPrinter printer;
     QPrintPreviewDialog *dialog = new QPrintPreviewDialog(&printer);
 
-    connect(dialog, &QPrintPreviewDialog::paintRequested, [this](QPrinter *previewPrinter) {
+    connect(dialog, &QPrintPreviewDialog::paintRequested, this, [this](QPrinter *previewPrinter) {
         QTextDocument document;
         switch (dataSource) {
         case SciBuffer:

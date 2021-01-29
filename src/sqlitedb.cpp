@@ -99,7 +99,7 @@ DBBrowserDB::DBBrowserDB() :
     db_used(false),
     isEncrypted(false),
     isReadOnly(false),
-    dontCheckForStructureUpdates(false)
+    disableStructureUpdateChecks(false)
 {
     // Register error log callback. This needs to be done before SQLite is first used
     Callback<void(void*, int, const char*)>::func = std::bind(&DBBrowserDB::errorLogCallback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
@@ -183,7 +183,7 @@ bool DBBrowserDB::open(const QString& db, bool readOnly)
     if (isOpen()) close();
 
     isEncrypted = false;
-    dontCheckForStructureUpdates = false;
+    disableStructureUpdateChecks = false;
 
     // Get encryption settings for database file
     CipherSettings* cipherSettings = nullptr;
@@ -287,7 +287,7 @@ bool DBBrowserDB::detach(const std::string& attached_as)
 
     waitForDbRelease();
 
-    // dettach database
+    // detach database
     if(!executeSQL("DETACH " + sqlb::escapeIdentifier(attached_as) + ";", false))
     {
         QMessageBox::warning(nullptr, qApp->applicationName(), lastErrorMessage);
@@ -755,6 +755,62 @@ bool DBBrowserDB::close()
     return true;
 }
 
+bool DBBrowserDB::saveAs(const std::string& filename) {
+    int rc;
+    sqlite3_backup *pBackup;
+    sqlite3 *pTo;
+
+    if(!_db)
+        return false;
+
+    waitForDbRelease();
+
+    // Open the database file identified by filename. Exit early if this fails
+    // for any reason.
+    rc = sqlite3_open(filename.c_str(), &pTo);
+    if(rc!=SQLITE_OK) {
+        qWarning() << tr("Cannot open destination file: '%1'").arg(filename.c_str());
+        return false;
+    } else {
+        // Set up the backup procedure to copy from the "main" database of
+        // connection _db to the main database of connection pTo.
+        // If something goes wrong, pBackup will be set to nullptr and an error
+        // code and message left in connection pTo.
+        //
+        // If the backup object is successfully created, call backup_step()
+        // to copy data from _db to pTo. Then call backup_finish()
+        // to release resources associated with the pBackup object.  If an
+        // error occurred, then an error code and message will be left in
+        // connection pTo. If no error occurred, then the error code belonging
+        // to pTo is set to SQLITE_OK.
+        //
+        pBackup = sqlite3_backup_init(pTo, "main", _db, "main");
+        if(pBackup == nullptr) {
+            qWarning() << tr("Cannot backup to file: '%1'. Message: %2").arg(filename.c_str()).arg(sqlite3_errmsg(pTo));
+            sqlite3_close(pTo);
+            return false;
+        } else {
+            sqlite3_backup_step(pBackup, -1);
+            sqlite3_backup_finish(pBackup);
+        }
+        rc = sqlite3_errcode(pTo);
+    }
+
+    if(rc == SQLITE_OK) {
+        // Close current database and set backup as current
+        sqlite3_close(_db);
+        _db = pTo;
+        curDBFilename = QString::fromStdString(filename);
+
+        return true;
+    } else {
+        qWarning() << tr("Cannot backup to file: '%1'. Message: %2").arg(filename.c_str()).arg(sqlite3_errmsg(pTo));
+        // Close failed database connection.
+        sqlite3_close(pTo);
+        return false;
+    }
+}
+
 DBBrowserDB::db_pointer_type DBBrowserDB::get(const QString& user, bool force_wait)
 {
     if(!_db)
@@ -1030,7 +1086,7 @@ bool DBBrowserDB::executeSQL(const std::string& statement, bool dirtyDB, bool lo
     if (SQLITE_OK == sqlite3_exec(_db, statement.c_str(), callback ? callbackWrapper : nullptr, &callback, &errmsg))
     {
         // Update DB structure after executing an SQL statement. But try to avoid doing unnecessary updates.
-        if(!dontCheckForStructureUpdates && (starts_with_ci(statement, "ALTER") ||
+        if(!disableStructureUpdateChecks && (starts_with_ci(statement, "ALTER") ||
                 starts_with_ci(statement, "CREATE") ||
                 starts_with_ci(statement, "DROP") ||
                 starts_with_ci(statement, "ROLLBACK")))
@@ -1130,7 +1186,7 @@ bool DBBrowserDB::executeMultiSQL(QByteArray query, bool dirty, bool log)
             }
 
             // Check whether the DB structure is changed by this statement
-            if(!dontCheckForStructureUpdates && !structure_updated)
+            if(!disableStructureUpdateChecks && !structure_updated)
             {
                 // Check if it's a modifying statement
                 if(next_statement.compare(0, 5, "ALTER") == 0 ||
@@ -1393,8 +1449,7 @@ bool DBBrowserDB::deleteRecords(const sqlb::ObjectIdentifier& table, const std::
 
     // Quote all values in advance
     std::vector<std::string> quoted_rowids;
-    for(QString rowid : rowids)
-        quoted_rowids.push_back(sqlb::escapeString(rowid.toStdString()));
+    std::transform(rowids.begin(), rowids.end(), std::back_inserter(quoted_rowids), [](const auto& rowid) { return sqlb::escapeString((rowid.toStdString())); });
 
     // For a single rowid column we can use a SELECT ... IN(...) statement which is faster.
     // For multiple rowid columns we have to use sqlb_make_single_value to decode the composed rowid values.
@@ -1771,7 +1826,7 @@ bool DBBrowserDB::alterTable(const sqlb::ObjectIdentifier& tablename, const sqlb
                     // Are we updating the field name or are we removing the field entirely?
                     if(!to.isNull())
                     {
-                        // We're updating the field name. So search for it in the index and replace it whereever it is found
+                        // We're updating the field name. So search for it in the index and replace it wherever it is found
                         for(size_t i=0;i<idx->fields.size();i++)
                         {
                             if(idx->fields[i].name() == from.toStdString())
